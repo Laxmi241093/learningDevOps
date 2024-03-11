@@ -1,0 +1,487 @@
+Ansible:
+
+to make ssh-passwordless connectivity in ubuntu
+run:
+ssh-keygen   - in host servers
+cd .ssh
+cat id.rsa.pub
+copy this id to authorize_keys into the cleint server and after try ssh, it will login as passwordless
+
+
+if we want group under group:
+we have to use children keyword to map the groups and access it.
+sudo nano hosts
+[all-servers:children]
+web-servers
+db-servers
+
+[web-servers]
+172.31.4.69
+
+[db-servers]
+172.31.37.118
+
+
+ansible-playbooks:
+multiple tasks and multiple plays.
+vi multiplays.yml
+---
+ - hosts: web-servers
+   become: true
+   tasks:
+     - name: "create a touch file"
+       command: touch /opt/client1.txt
+
+     - name: "create a directory"
+       command: mkdir /opt/client1test
+
+ - hosts: db-servers
+   become: true
+   tasks:
+     - name: "create a file"
+       command: touch /opt/client2.txt
+
+     - name: "create a directory"
+       command: mkdir /opt/cleint2test
+save it.
+ansible-playbook multiplays.yml
+
+copy module:
+copy file with specific owner and permissions:
+vi copy.yml
+---
+ - hosts: web-servers
+   become: true
+   tasks:
+     - name: "create a touch file"
+       copy:
+         src: /opt/ansible/test.txt
+         dest: /opt/
+         owner: ubuntu
+         group: ubuntu
+         mode: 0744
+save it.
+ansible-playbook copy.yml
+
+
+lineInfile module:
+if we want to insert data inside the file or text file we can insert it and it will not replicate the multiple entries
+vi lineInFile.yml
+---
+ - hosts: web-servers
+   become: true
+   tasks:
+     - name: "insert line into the file"
+       lineinfile:
+         path: /opt/test.txt
+         line: "Deepanshu"
+save it.
+ansible-playbook lineInFile.yml
+
+
+script module:
+it will run the script into the target machine.
+vi testScript.sh
+#!/bin/bash
+pwd >> /tmp/fileCreated.txt
+echo "first arg: $1" >> /tmp/fileCreated.txt
+echo "=====================" >> /tmp/fileCreated.txt
+
+ifconfig >> /tmp/fileCreated.txt
+save it.
+vi script.yml
+---
+ - hosts: all-servers
+   become: true
+   tasks:
+     - name: "run script"
+       script: /opt/ansible/testScript.sh Deepanshu
+save it.
+ansible-playbook script.yml
+vi script1.yml
+---
+ - hosts: all-servers
+   become: true
+   tasks:
+     - name: "run script"
+       script: /opt/ansible/testScript.sh Deepanshu creates=/tmp/test.txt
+save it.
+ansible-playbook script1.yml
+if test.txt file is there then it will not run the script.
+vi script2.yml
+---
+ - hosts: all-servers
+   become: true
+   tasks:
+     - name: "run script"
+       script: /opt/ansible/testScript.sh Deepanshu removes=/tmp/test.txt chdir=/home
+save it.
+ansible-playbook script2.yml
+if test.txt file is there then it will run the script.
+
+
+service module:
+it is usedd to start or stop the services of software.
+vi service.yml
+---
+- hosts: web-servers
+  become: true
+  tasks:
+    - name: "start the service of apache2"
+      service:
+        name: apache2
+        state: stopped
+save it.
+ansible-playbook service.yml
+vi service1.yml
+---
+- hosts: web-servers
+  become: true
+  tasks:
+    - name: "start the service of apache2"
+      service:
+        name: apache2
+        state: started
+save it.
+ansible-playbook service1.yml
+
+
+user module:
+create encrypted password first to create a user
+mkpasswd --method=sha-512    - give your desired password and it will give you the encypted password
+vi user.yml
+---
+- hosts: web-servers
+  become: true
+  tasks:
+    - name: create a user
+      user:
+        name: "deepanshu"
+        state: present
+        password: "$6$NFf8xUGxj8duq$dFqsQEQXy81qsFDa.EGgoFFwYPiRDVLR/38/BA0b5pDVEpStiZ8BCSKaz/AgRiBQ1GD8nTgKHwtix5p77WPBj0"
+save it.
+ansible-playbook user.yml   -it will create the user
+vi user2.yml
+---
+- hosts: web-servers
+  become: true
+  tasks:
+    - name: create a user
+      user:
+        name: "deepanshu"
+        state: absent
+        remove: yes
+save it.
+ansible-playbook user2.yml   - it will delete the user as well as directory of user from home because we have given remove.
+
+
+ansible variables:
+vi vars.yml
+---
+- hosts: web-servers
+  become: true
+  vars:
+    servicename: apache2
+  tasks:
+    - name: "start the service of apache2"
+      service:
+        name: "{{servicename}}"
+        state: started
+save it.
+ansible-playbook vars.yml
+
+
+Ansible Conditions:
+vi conditions.yml
+---
+- hosts: web-servers
+  become: true
+  vars:
+    age: 15
+  tasks:
+    - name: create file
+      command: touch /tmp/15.txt
+      when: age == 14 or age == 15
+
+    - name: create file
+      command: touch /tmp/greater.txt
+      when: age < 18
+
+    - name: create file
+      command: touch /tmp/smaller.txt
+      when : age > 14
+save it.
+ansible-playbook conditions.yml
+
+
+apt module:
+vi apt.yml
+---
+- hosts: web-servers
+  become: true
+  tasks:
+    - name: install tree
+      apt:
+        name: tree
+        state: present
+
+    - name: install nano
+      apt:
+        name: nano
+        state: present
+save it.
+ansible-playbook apt.yml
+vi apt.yml  (to remove packages)
+---
+- hosts: web-servers
+  become: true
+  tasks:
+    - name: install tree
+      apt:
+        name: tree
+        state: absent
+
+    - name: install nano
+      apt:
+        name: nano
+        state: absent
+save it.
+ansible-playbook apt.yml
+
+ansible loops:
+vi loops.yml
+---
+- hosts: web-servers
+  become: true
+  vars:
+    pkg:
+     - tree
+     - nano
+  tasks:
+    - name: install  tree and nano
+      apt:
+        name: "{{ pkg }}"
+        state: absent
+        #  with_items: "{{ pkg }}"
+save it.
+ansible-playbook loops.yml
+
+
+fileseprataion ansible:
+vi filesep.yml
+---
+- hosts: web-servers
+  become: true
+  vars_files:
+    - variable.yml
+
+  tasks:
+    - include: tasks1.yml
+    - include: tasks2.yml
+save it.
+ansible-playbook filesep.yml
+vi tasks1.yml
+- name: create var1
+  command: touch /tmp/task/{{var1}}.txt
+
+- name: create var2
+  command: touch /tmp/task/{{var2}}.txt
+
+- name: create var3
+  command: touch /tmp/task/{{var3}}.txt
+
+- name: create var4
+  command: touch /tmp/task/{{var4}}.txt
+save it.
+vi tasks2.yml
+- name: create var5
+  command: touch /tmp/task/{{var5}}.txt
+
+- name: create var6
+  command: touch /tmp/task/{{var6}}.txt
+
+- name: create var7
+  command: touch /tmp/task/{{var7}}.txt
+
+- name: create var8
+  command: touch /tmp/task/{{var8}}.txt
+save it.
+vi variable.yml
+var1: file1
+var2: file2
+var3: file3
+var4: file4
+var5: file5
+var6: file6
+var7: file7
+var8: file8
+save it.
+
+
+ansible roles:
+mkdir roles
+ansible-galaxy init filetouch
+ansible-galaxy init treenano
+cd filetouch/vars
+vi main.yml
+---
+# vars file for filetouch
+var1: file1
+var2: file2
+var3: file3
+save it.
+cd ..
+cd /tasks/
+vi main.yml
+---
+# tasks file for filetouch
+- name: create a file1
+  command: touch /tmp/{{var1}}.txt
+
+- name: create a file2
+  command: touch /tmp/{{var2}}.txt
+
+- name: create a file3
+  command: touch /tmp/{{var3}}.txt
+save it.
+cd /treenano/vars
+vi main.yml
+---
+# vars file for treenano
+softwares:
+  - tree
+  - nano
+save it.
+cd ..
+cd /tasks/
+vi main.yml
+---
+# tasks file for treenano
+- name: install softwares
+  apt:
+    name: "{{softwares}}"
+    state: present
+save it.
+cd ../../..
+vi ansible_roles.yml
+---
+- hosts: web-servers
+  become: true
+  roles:
+    - filetouch
+    - treenano
+save it.
+ansible-playbook ansible_roles.yml
+
+
+Strategies in ansible:
+vi free.yml   (if we have multiple servers and multiple tasks, if one server stuck at one task then the tasks of other server will be continiuosly exected)
+---
+- hosts: web-servers,db-servers
+  become: true
+  strategy: free
+  tasks:
+    -
+	  name: 'first task'
+	  apt: name='apache2'
+	    state: 'present'
+    -
+	  name: 'second task'
+	  command: touch /tmp/free_task.txt
+save it.
+ansible-playbook free.yml
+vi serial.yml  (it will execute all tasks in one server then only proceed with other servers)
+---
+- hosts: web-servers,db-servers
+  become: true
+  serial: 1
+  tasks:
+    -
+	  name: 'first task'
+	  apt: name='apache2'
+	    state: 'present'
+    -
+	  name: 'second task'
+	  command: touch /tmp/free_task.txt
+save it.
+ansible-playbook serial.yml
+
+error handling in ansible:
+vi error_handling.yml   (if one task is fail then it will continue to execute others tasks)
+---
+- hosts: web-servers
+  become: true
+  tasks:
+    - name: create a file under task directory
+      command: touch /tmp/task/task.txt
+      ignore_errors: True
+
+    - name: create a touch file
+      command: touch /tmp/task.txt
+save it.
+ansible-playbook error_handling.yml
+
+
+jinja2 in ansible:
+vi debug.yml  ( there are different types of templates)
+---
+- hosts: web-servers
+  become: true
+  vars:
+    your_name: Deepanshu
+    dummy_list:
+      - 1
+      - 10
+      - 20
+      - 30
+      - 10
+    dummy_list2:
+      - 30
+      - 40
+      - 10
+      - 50
+  tasks:
+    - debug:
+        msg: "hello {{your_name}}"
+
+    - debug:
+        msg: "hello {{your_name | upper }}"
+
+    - debug:
+        msg: "hello {{your_name | lower }}"
+
+    - debug:
+        msg: "hello {{your_name | replace('Deepanshu','Jatin') }}"
+
+    - debug:
+        msg: "{{ dummy_list | min }}"
+
+    - debug:
+        msg: "{{ dummy_list | max }}"
+
+    - debug:
+        msg: "{{ dummy_list | unique }}"
+
+    - debug:
+        msg: "{{ dummy_list | union(dummy_list2) }}"
+
+    - debug:
+        msg: "{{ dummy_list | intersect(dummy_list2) }}"
+
+    - debug:
+        msg: "{{ 100 | random }}"
+
+    - debug:
+        msg: "{{'/etc/ansible/ansible.cfg' | basename }}"
+save it.
+ansible-playbook debug.yml
+
+
+
+
+
+
+
+
+
+
